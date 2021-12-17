@@ -1,9 +1,18 @@
 import numpy as np
+from numpy import exp
 from numpy.random import normal
 from scipy.optimize import approx_fprime
 from matplotlib.backends.backend_pdf import PdfPages
 import matplotlib.pyplot as plt
 import json
+
+from scipy.special import softmax
+
+
+x_train_g = np.empty((40, 4))
+y_train_g = np.empty((280, 4))
+x_test_g = np.empty((40,))
+y_test_g = np.empty((280,))
 
 
 class NN(object):
@@ -17,12 +26,17 @@ class NN(object):
         self.init_params()
 
     def init_params(self):
-        self.theta = {}
-        self.theta['W0'] = normal(0, 0.05, (self.num_hidden, self.num_input))
-        self.theta['W1'] = normal(0, 0.05, (self.num_output, self.num_hidden))
-        self.theta['b0'] = normal(0, 0.05, self.num_hidden)
-        self.theta['b1'] = normal(0, 0.05, self.num_output)
+        self.theta = {'W0': normal(0, 0.05, (self.num_hidden, self.num_input)),
+                      'W1': normal(0, 0.05, (self.num_output, self.num_hidden)),
+                      'b0': normal(0, 0.05, self.num_hidden),
+                      'b1': normal(0, 0.05, self.num_output)}
 
+    @staticmethod
+    def activation_h(z: np.ndarray):
+        return np.log(1 + exp(z))
+
+    def forward(self, x: np.ndarray):
+        return softmax(self.theta['W1'] @ self.activation_h(self.theta['W0'] @ x + self.theta['b0']) + self.theta['b1'])
 
     def export_model(self):
         with open(f'model_{self.gradient_method}.json', 'w') as fp:
@@ -44,6 +58,7 @@ def task1():
     # Create the models
     # Model using steepest descent
     net_GD = NN(num_input, num_hidden, num_output, gradient_method='GD')
+    y_hat = net_GD.forward(x_test_g[0, :])
 
     # Model using Nesterovs method
     net_NAG = NN(num_input, num_hidden, num_output, gradient_method='NAG')
