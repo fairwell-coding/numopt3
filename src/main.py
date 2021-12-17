@@ -1,4 +1,5 @@
 import numpy as np
+from numpy.random import normal
 from scipy.optimize import approx_fprime
 from matplotlib.backends.backend_pdf import PdfPages
 import matplotlib.pyplot as plt
@@ -17,10 +18,11 @@ class NN(object):
 
     def init_params(self):
         self.theta = {}
-        self.theta['W0'] = np.array(0)
-        self.theta['W1'] = np.array(0)
-        self.theta['b0'] = np.array(0)
-        self.theta['b1'] = np.array(0)
+        self.theta['W0'] = normal(0, 0.05, (self.num_hidden, self.num_input))
+        self.theta['W1'] = normal(0, 0.05, (self.num_output, self.num_hidden))
+        self.theta['b0'] = normal(0, 0.05, self.num_hidden)
+        self.theta['b1'] = normal(0, 0.05, self.num_output)
+
 
     def export_model(self):
         with open(f'model_{self.gradient_method}.json', 'w') as fp:
@@ -35,12 +37,16 @@ def task1():
             - ax[1] Plot showing the training and test accuracy for both variants
     """
 
+    num_input = 4
+    num_hidden = 16
+    num_output = 3
+
     # Create the models
     # Model using steepest descent
-    net_GD = NN(1, 1, 1, gradient_method='GD')
+    net_GD = NN(num_input, num_hidden, num_output, gradient_method='GD')
 
     # Model using Nesterovs method
-    net_NAG = NN(1, 1, 1, gradient_method='NAG')
+    net_NAG = NN(num_input, num_hidden, num_output, gradient_method='NAG')
 
     net_GD.export_model()
     net_NAG.export_model()
@@ -57,6 +63,7 @@ def task1():
     axs[1].set_title('Accuracy')
     axs[1].grid()
     return fig
+
 
 if __name__ == '__main__':
 
