@@ -9,10 +9,10 @@ import json
 from scipy.special import softmax
 
 
-x_train_g = np.empty((40, 4))
-y_train_g = np.empty((280, 4))
-x_test_g = np.empty((40,))
-y_test_g = np.empty((280,))
+x_train_g = np.empty((280, 4))
+y_train_g = np.empty((280, ))
+x_test_g = np.empty((40, 4))
+y_test_g = np.empty((40, ))
 
 
 class NN(object):
@@ -32,11 +32,43 @@ class NN(object):
                       'b1': normal(0, 0.05, self.num_output)}
 
     @staticmethod
+    def softmax(self, z2: np.ndarray):
+        ''' Non-linear output activation function, i.e. softmax for multi-class classification, which outputs the probabilities for each class w.r.t. the sample.
+
+        :param z2: pre-activation input for output-layer
+        :return: softmax output (probabilities of all classes which sum to 1)
+        '''
+
+        return np.exp(z2) / np.sum(np.exp(z2))
+
+    @staticmethod
     def activation_h(z: np.ndarray):
         return np.log(1 + exp(z))
 
     def forward(self, x: np.ndarray):
-        return softmax(self.theta['W1'] @ self.activation_h(self.theta['W0'] @ x + self.theta['b0']) + self.theta['b1'])
+        self.x = x
+        self.z1 = self.theta['W0'] @ x + self.theta['b0']
+        self.a1 = self.activation_h(self.z1)
+        self.z2 = self.theta['W1'] @ self.a1 + self.theta['b1']
+        self.a2 = softmax(self.z2)
+
+        return self.a2
+
+    def backward(self, y, y_hat):
+        del_L_a2 = - np.divide(y, y_hat)  # derivative of loss w.r.t. output activation function
+        del_a2_z2 = softmax(self.z2) - softmax(self.z2)**2
+        del_z2_W1 = self.a1
+        del_z2_a1 = self.theta['W1']
+        del_a1_z1 = np.exp(self.z1) / (1 + np.exp(self.z1))
+        del_z1_W0 = self.x
+
+        del_W1 = np.matmul((del_L_a2 * del_a2_z2).reshape(self.num_output, 1), del_z2_W1.T.reshape(1, self.num_hidden))
+        del_b1 = del_L_a2 * del_a2_z2
+        del_W0 = del_L_a2 * del_a2_z2 * del_z2_a1 * del_a1_z1 * del_z1_W0
+        del_b0 = del_L_a2 * del_a2_z2 * del_z2_a1 * del_a1_z1
+
+        print('x')
+
 
     def export_model(self):
         with open(f'model_{self.gradient_method}.json', 'w') as fp:
@@ -59,6 +91,7 @@ def task1():
     # Model using steepest descent
     net_GD = NN(num_input, num_hidden, num_output, gradient_method='GD')
     y_hat = net_GD.forward(x_test_g[0, :])
+    net_GD.backward(y_train_g[0], y_hat)
 
     # Model using Nesterovs method
     net_NAG = NN(num_input, num_hidden, num_output, gradient_method='NAG')
@@ -105,4 +138,3 @@ if __name__ == '__main__':
         pdf.savefig(fig)
     pdf.close()
 
-    
