@@ -52,9 +52,10 @@ class NN(object):
         return: softmax derivative of x
         """
 
-        s = NN.softmax(x).reshape(-1,1)  # Reshape the 1-d softmax to 2-d so that np.dot will do the matrix multiplication
-        return np.diagflat(s) - np.dot(s, s.T)
+        # s = NN.softmax(x).reshape(-1, 1)  # Reshape the 1-d softmax to 2-d so that np.dot will do the matrix multiplication
+        # return np.diagflat(s) - np.dot(s, s.T)
 
+        return x  # TODO: dummy replacement to continue implementation
 
     @staticmethod
     def softplus(x: np.ndarray):
@@ -86,9 +87,9 @@ class NN(object):
 
                 # optimize network
                 if self.gradient_method == 'GD':
-                    self.steepest_descent(mini_batch_x, mini_batch_y, lr)
+                    self.steepest_descent(lr)
                 elif self.gradient_method == 'NAG':
-                    self.nesterov_accelerated_gradient(mini_batch_x, mini_batch_y, lr)
+                    self.nesterov_accelerated_gradient(lr)
 
     def forward(self, x: np.ndarray):
         self.layers[0]['pre_activation'] = self.layers[0]['W0'] @ x + self.layers[0]['b0']
@@ -105,31 +106,45 @@ class NN(object):
         param y: supervised label
         """
 
+        # Calculate gradients for parameters of output layer
         del_L_a2 = - y / self.layers[1]['output']  # derivative of loss function w.r.t. predicted output (i.e. activation of output layer: a2)
         delta_1 = self.softmax_derivative(del_L_a2)  # = delta_1, b1 | (del_L / del_a2) * (del_a2 / del_z2): derivative of loss (L) w.r.t. pre-activation of output layer (z2)
         del_L_W1 = np.outer(delta_1, self.layers[0]['output'].T)  # W1 | delta_1 * a1.T: derivative of loss (L) w.r.t. weight matrix of output layer (W1)
 
+        # Calculate gradients for parameters of hidden layer
         del_L_a1 = np.matmul(self.layers[1]['W1'].T, delta_1)  # derivative of loss function w.r.t. activated output of hidden layer (i.e. a1)
-        delta_2 = self.softplus_derivative(del_L_a1)  # = delta_2, b0 | (del_L / del_z1): derivative of loss (L) w.r.t. pre-activation of hidden layer (z1)
-        del_L_W0 = np.outer(delta_2, x.T)  # W0 | delta_2 * x.T: derivative of loss (L) w.r.t. weight matrix of hidden layer (W0)
+        delta_0 = self.softplus_derivative(del_L_a1)  # = delta_2, b0 | (del_L / del_z1): derivative of loss (L) w.r.t. pre-activation of hidden layer (z1)
+        del_L_W0 = np.outer(delta_0, x.T)  # W0 | delta_0 * x.T: derivative of loss (L) w.r.t. weight matrix of hidden layer (W0)
 
-    def steepest_descent(self, x: np.ndarray, y: np.ndarray, lr):
+        # Store calculated gradients in their respective network layers
+        self.layers[1]['W1_grad'] = del_L_W1
+        self.layers[1]['b1_grad'] = delta_1
+        self.layers[0]['W0_grad'] = del_L_W0
+        self.layers[0]['b0_grad'] = delta_0
+
+    def steepest_descent(self, lr):
         """ Optimize network weights based on steepest gradient descent algorithm to update model weights for current training iteration
 
-        param x: sample used for current forward pass
-        param y: supervised label
         param lr: learning rate used for optimization step
         """
 
-        print('x')
+        self.layers[1]['W1'] -= lr * self.layers[1]['W1_grad']
+        self.layers[1]['b1'] -= lr * self.layers[1]['b1_grad']
+        self.layers[0]['W0'] -= lr * self.layers[0]['W0_grad']
+        self.layers[0]['b0'] -= lr * self.layers[0]['b0_grad']
 
-    def nesterov_accelerated_gradient(self, x: np.ndarray, y: np.ndarray, lr):
+        print('x')  # TODO: Do we need to use normalized gradients for steepest descent?
+
+    def nesterov_accelerated_gradient(self, lr):
         """ Optimize network weights based on Nesterov accelerated gradient method to update model weights for current training iteration
 
-        param x: sample used for current forward pass
-        param y: supervised label
         param lr: learning rate used for optimization step
         """
+
+        self.layers[1]['W1'] -= lr * self.layers[1]['W1_grad']
+        self.layers[1]['b1'] -= lr * self.layers[1]['b1_grad']
+        self.layers[0]['W0'] -= lr * self.layers[0]['W0_grad']
+        self.layers[0]['b0'] -= lr * self.layers[0]['b0_grad']
 
         print('x')
 
