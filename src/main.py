@@ -6,12 +6,11 @@ from matplotlib.backends.backend_pdf import PdfPages
 import matplotlib.pyplot as plt
 import json
 
-
 # Train & test data sets
 x_train_g = np.empty((280, 4))
-y_train_g = np.empty((280, ))
+y_train_g = np.empty((280,))
 x_test_g = np.empty((40, 4))
-y_test_g = np.empty((40, ))
+y_test_g = np.empty((40,))
 
 
 class NN(object):
@@ -25,11 +24,11 @@ class NN(object):
         self.init_params()
 
     def init_params(self):
-        self.theta = []
-        self.theta.append({'W0': normal(0, 0.05, (self.num_hidden, self.num_input)),
-                           'b0': normal(0, 0.05, self.num_hidden)})  # hidden layer
-        self.theta.append({'W1': normal(0, 0.05, (self.num_output, self.num_hidden)),
-                           'b1': normal(0, 0.05, self.num_output)})  # output layer
+        self.layers = []
+        self.layers.append({'W0': normal(0, 0.05, (self.num_hidden, self.num_input)),
+                            'b0': normal(0, 0.05, self.num_hidden)})  # hidden layer
+        self.layers.append({'W1': normal(0, 0.05, (self.num_output, self.num_hidden)),
+                            'b1': normal(0, 0.05, self.num_output)})  # output layer
 
     @staticmethod
     def softmax(x: np.ndarray):
@@ -42,6 +41,16 @@ class NN(object):
         return np.exp(x) / np.sum(np.exp(x))
 
     @staticmethod
+    def softmax_derivative(x: np.ndarray):
+        """ Calculates the derivative of the softmax output function
+
+        param x: backpropagated error (delta) from previous layer
+        return: softmax derivative of x
+        """
+
+        return NN.softmax(x) - NN.softmax(x)**2
+
+    @staticmethod
     def softplus(x: np.ndarray):
         """ Softplus activation function used for hidden layer.
 
@@ -50,30 +59,54 @@ class NN(object):
         """
         return np.log(1 + exp(x))
 
-    def train(self, lr, epochs):
-        for epoch in range(epochs):
-            for train_sample in x_train_g:
-                y_hat = self.forward(train_sample)
-                self.backward()
+    @staticmethod
+    def softplus_derivative(x: np.ndarray):
+        """ Calculates the derivative of the softplus activation function for the hidden layer
 
-    def predict(self, x: np.ndarray):
-        return self.forward(x, store_predictions=False)
-
-    def forward(self, x: np.ndarray, store_predictions=True):
-        self.theta[0]['z1'] = self.theta[0]['W0'] @ x + self.theta[0]['b0']
-        self.theta[0]['a1'] = self.softplus(self.theta[0]['z1'])
-        self.theta[1]['z2'] = self.theta[1]['W1'] @ self.theta[0]['a1'] + self.theta[1]['b1']
-        self.theta[1]['a2'] = self.softmax(self.theta[1]['z2'])
-
-        return self.theta[1]['a2']
-
-    def backward(self):
-        """ Perform backwards pass (backpropagate errors using partial derivatives via chain-rule)
+        param x: backpropagated error (delta) from previous layer
+        return: softplus derivative of x
         """
 
+        return np.exp(x) / (1 + np.exp(x))
 
+    def train(self, lr, epochs):
+        for epoch in range(epochs):
+            for sample_index in range(x_train_g.shape[0]):  # using single batch (i.e. batch_size = 1)
+                mini_batch_x = x_train_g[sample_index]
+                mini_batch_y = self.__encode_output(y_train_g[sample_index])  # converts the target label to the required network output format (i.e. 3 neurons of last layer)
+
+                self.forward(mini_batch_x)
+                self.backward(mini_batch_x, mini_batch_y)
+
+    def forward(self, x: np.ndarray):
+        self.layers[0]['pre_activation'] = self.layers[0]['W0'] @ x + self.layers[0]['b0']
+        self.layers[0]['output'] = self.softplus(self.layers[0]['pre_activation'])
+        self.layers[1]['pre_activation'] = self.layers[1]['W1'] @ self.layers[0]['output'] + self.layers[1]['b1']
+        self.layers[1]['output'] = self.softmax(self.layers[1]['pre_activation'])
+
+        return self.layers[1]['output']
+
+    def backward(self, x: np.ndarray, y: np.ndarray):
+        """ Perform backwards pass by computing gradients w.r.t. the model parameters (backpropagate errors through the network using partial derivatives via chain-rule)
+
+        param x: sample used for current forward pass
+        param y: supervised label
+        """
+
+        del_L_a2 = - y / self.layers[1]['output']  # derivative of loss function w.r.t. predicted output (i.e. activation of output layer: a2)
+        delta_1 = self.softmax_derivative(del_L_a2)  # = delta_1, b1 | (del_L / del_a2) * (del_a2 / del_z2): derivative of loss (L) w.r.t. pre-activation of output layer (z2)
+        del_L_W1 = np.outer(delta_1, self.layers[0]['output'].T)  # W1 | delta_1 * a1.T: derivative of loss (L) w.r.t. weight matrix of output layer (W1)
+
+        del_L_a1 = np.matmul(self.layers[1]['W1'].T, delta_1)  # derivative of loss function w.r.t. activated output of hidden layer (i.e. a1)
+        delta_2 = self.softplus_derivative(del_L_a1)  # = delta_2, b0 | (del_L / del_z1): derivative of loss (L) w.r.t. pre-activation of hidden layer (z1)
+        del_L_W0 = np.outer(delta_2, x.T)  # W0 | delta_2 * x.T: derivative of loss (L) w.r.t. weight matrix of hidden layer (W0)
 
         print('x')
+
+    def __encode_output(self, y):
+        target_label = [0 for i in range(self.num_output)]
+        target_label[y] = 1
+        return np.asarray(target_label, dtype=self.dtype)
 
     def backward_old(self, y, y_hat):
         """
@@ -84,9 +117,9 @@ class NN(object):
         """
 
         del_L_a2 = - np.divide(y, y_hat)  # derivative of loss w.r.t. output activation function
-        del_a2_z2 = self.softmax(self.z2) - self.softmax(self.z2)**2
+        del_a2_z2 = self.softmax(self.z2) - self.softmax(self.z2) ** 2
         del_z2_W1 = self.a1
-        del_z2_a1 = self.theta['W1']
+        del_z2_a1 = self.layers['W1']
         del_a1_z1 = np.exp(self.z1) / (1 + np.exp(self.z1))
         del_z1_W0 = self.x
 
@@ -99,7 +132,7 @@ class NN(object):
 
     def export_model(self):
         with open(f'model_{self.gradient_method}.json', 'w') as fp:
-            for layer in self.theta:
+            for layer in self.layers:
                 json.dump({key: value.tolist() for key, value in layer.items()}, fp)
 
 
