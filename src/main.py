@@ -24,6 +24,10 @@ class NN(object):
         self.init_params()
 
     def init_params(self):
+        """ Create layers and their corresponding learnable model parameters (theta)
+
+        """
+
         self.layers = []
         self.layers.append({'W0': normal(0, 0.05, (self.num_hidden, self.num_input)),
                             'b0': normal(0, 0.05, self.num_hidden)})  # hidden layer
@@ -79,7 +83,12 @@ class NN(object):
 
                 self.forward(mini_batch_x)
                 self.backward(mini_batch_x, mini_batch_y)
-                self.optimize(mini_batch_x, mini_batch_y, lr)
+
+                # optimize network
+                if self.gradient_method == 'GD':
+                    self.steepest_descent(mini_batch_x, mini_batch_y, lr)
+                elif self.gradient_method == 'NAG':
+                    self.nesterov_accelerated_gradient(mini_batch_x, mini_batch_y, lr)
 
     def forward(self, x: np.ndarray):
         self.layers[0]['pre_activation'] = self.layers[0]['W0'] @ x + self.layers[0]['b0']
@@ -104,40 +113,30 @@ class NN(object):
         delta_2 = self.softplus_derivative(del_L_a1)  # = delta_2, b0 | (del_L / del_z1): derivative of loss (L) w.r.t. pre-activation of hidden layer (z1)
         del_L_W0 = np.outer(delta_2, x.T)  # W0 | delta_2 * x.T: derivative of loss (L) w.r.t. weight matrix of hidden layer (W0)
 
-    def optimize(self, x: np.ndarray, y: np.ndarray, lr):
-        """ Optimize network weights based on chosen gradient descent algorithm to update model weights for current training iteration
+    def steepest_descent(self, x: np.ndarray, y: np.ndarray, lr):
+        """ Optimize network weights based on steepest gradient descent algorithm to update model weights for current training iteration
 
         param x: sample used for current forward pass
         param y: supervised label
         param lr: learning rate used for optimization step
         """
 
+        print('x')
+
+    def nesterov_accelerated_gradient(self, x: np.ndarray, y: np.ndarray, lr):
+        """ Optimize network weights based on Nesterov accelerated gradient method to update model weights for current training iteration
+
+        param x: sample used for current forward pass
+        param y: supervised label
+        param lr: learning rate used for optimization step
+        """
+
+        print('x')
+
     def __encode_output(self, y):
         target_label = [0 for i in range(self.num_output)]
         target_label[y] = 1
         return np.asarray(target_label, dtype=self.dtype)
-
-    def backward_old(self, y, y_hat):
-        """
-
-        :param y: target label for supervised learning
-        :param y_hat: predicted value
-        :return:
-        """
-
-        del_L_a2 = - np.divide(y, y_hat)  # derivative of loss w.r.t. output activation function
-        del_a2_z2 = self.softmax(self.z2) - self.softmax(self.z2) ** 2
-        del_z2_W1 = self.a1
-        del_z2_a1 = self.layers['W1']
-        del_a1_z1 = np.exp(self.z1) / (1 + np.exp(self.z1))
-        del_z1_W0 = self.x
-
-        # del_W1 = np.matmul((del_L_a2 * del_a2_z2).reshape(self.num_output, 1), del_z2_W1.T.reshape(1, self.num_hidden))
-        # del_b1 = del_L_a2 * del_a2_z2
-        # del_W0 = del_L_a2 * del_a2_z2 * del_z2_a1 * del_a1_z1 * del_z1_W0
-        # del_b0 = del_L_a2 * del_a2_z2 * del_z2_a1 * del_a1_z1
-
-        print('x')
 
     def export_model(self):
         with open(f'model_{self.gradient_method}.json', 'w') as fp:
