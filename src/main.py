@@ -48,7 +48,9 @@ class NN(object):
         return: softmax derivative of x
         """
 
-        return NN.softmax(x) - NN.softmax(x)**2
+        s = NN.softmax(x).reshape(-1,1)  # Reshape the 1-d softmax to 2-d so that np.dot will do the matrix multiplication
+        return np.diagflat(s) - np.dot(s, s.T)
+
 
     @staticmethod
     def softplus(x: np.ndarray):
@@ -67,7 +69,7 @@ class NN(object):
         return: softplus derivative of x
         """
 
-        return np.exp(x) / (1 + np.exp(x))
+        return np.exp(x) / (1 + np.exp(x))  # logistic function
 
     def train(self, lr, epochs):
         for epoch in range(epochs):
@@ -77,6 +79,7 @@ class NN(object):
 
                 self.forward(mini_batch_x)
                 self.backward(mini_batch_x, mini_batch_y)
+                self.optimize(mini_batch_x, mini_batch_y, lr)
 
     def forward(self, x: np.ndarray):
         self.layers[0]['pre_activation'] = self.layers[0]['W0'] @ x + self.layers[0]['b0']
@@ -101,7 +104,13 @@ class NN(object):
         delta_2 = self.softplus_derivative(del_L_a1)  # = delta_2, b0 | (del_L / del_z1): derivative of loss (L) w.r.t. pre-activation of hidden layer (z1)
         del_L_W0 = np.outer(delta_2, x.T)  # W0 | delta_2 * x.T: derivative of loss (L) w.r.t. weight matrix of hidden layer (W0)
 
-        print('x')
+    def optimize(self, x: np.ndarray, y: np.ndarray, lr):
+        """ Optimize network weights based on chosen gradient descent algorithm to update model weights for current training iteration
+
+        param x: sample used for current forward pass
+        param y: supervised label
+        param lr: learning rate used for optimization step
+        """
 
     def __encode_output(self, y):
         target_label = [0 for i in range(self.num_output)]
