@@ -85,18 +85,15 @@ class NN(object):
 
     def train(self, lr, epochs):
         for epoch in range(epochs):
-            for sample_index in range(x_train_g.shape[0]):  # using single batch (i.e. batch_size = 1)
-                mini_batch_x = x_train_g[sample_index]
-                mini_batch_y = self.__encode_output(y_train_g[sample_index])  # converts the target label to the required network output format (i.e. 3 neurons of last layer)
+            y_encoded = self.encode_output(y_train_g)  # converts the target label to the required network output format (i.e. 3 neurons of last layer)
+            self.forward(x_train_g)
 
-                self.forward(mini_batch_x)
-
-                if self.gradient_method == 'GD':
-                    self.backward_GD(mini_batch_x, mini_batch_y)
-                    self.steepest_descent(lr)
-                elif self.gradient_method == 'NAG':
-                    self.backward_NAG(mini_batch_x, mini_batch_y)
-                    self.nesterov_accelerated_gradient(lr)
+            if self.gradient_method == 'GD':
+                self.backward_GD(x_train_g, y_encoded)
+                self.steepest_descent(lr)
+            elif self.gradient_method == 'NAG':
+                self.backward_NAG(x_train_g, y_encoded)
+                self.nesterov_accelerated_gradient(lr)
 
     def forward(self, x: np.ndarray):
         self.layers[0]['pre_activation'] = self.layers[0]['W0'] @ x + self.layers[0]['b0']
@@ -179,10 +176,19 @@ class NN(object):
         self.last_update_W0 = self.layers[0]['W0']
         self.last_update_b0 = self.layers[0]['b0']
 
-    def __encode_output(self, y):
+    def encode_target_label(self, y):
         target_label = [0 for i in range(self.num_output)]
         target_label[y] = 1
+
         return np.asarray(target_label, dtype=self.dtype)
+
+    def encode_output(self, y):
+        y_encoded = np.empty((y_train_g.shape[0], self.num_output))
+
+        for i in range(y_encoded.shape[0]):
+            y_encoded[i, :] = self.encode_target_label(y[i])
+
+        return y_encoded
 
     def export_model(self):
         with open(f'model_{self.gradient_method}.json', 'w') as fp:
@@ -205,12 +211,12 @@ def task1():
 
     # y_hat = net_GD.forward(x_test_g[0, :])
     # net_GD.backward(y_train_g[0], y_hat)
-    # net_GD = NN(num_input, num_hidden, num_output, gradient_method='GD')  # create NN with the steepest gradient descent
-    # net_GD.train(lr=0.01, epochs=350)  # lr = {0.1, 0.001}
+    net_GD = NN(num_input, num_hidden, num_output, gradient_method='GD')  # create NN with the steepest gradient descent
+    net_GD.train(lr=0.01, epochs=350)  # lr = {0.1, 0.001}
 
     # Model using Nesterovs method
-    net_NAG = NN(num_input, num_hidden, num_output, gradient_method='NAG')
-    net_NAG.train(lr=0.01, epochs=350)
+    # net_NAG = NN(num_input, num_hidden, num_output, gradient_method='NAG')
+    # net_NAG.train(lr=0.01, epochs=350)
 
     # Export models
     # net_GD.export_model()
