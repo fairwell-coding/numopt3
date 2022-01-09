@@ -28,10 +28,10 @@ class NN(object):
         self.test_acc = []
 
         self.momentum = 0.0
-        self.last_update_W1 = np.empty((3, 16))
-        self.last_update_b1 = np.empty((3,))
-        self.last_update_W0 = np.empty((16, 4))
-        self.last_update_b0 = np.empty((16,))
+        self.last_update_W1 = np.zeros((3, 16))
+        self.last_update_b1 = np.zeros((3,))
+        self.last_update_W0 = np.zeros((16, 4))
+        self.last_update_b0 = np.zeros((16,))
 
         self.init_params()
 
@@ -140,8 +140,8 @@ class NN(object):
             y_hat_epoch[sample_index, :] = y_hat
             y_encoded_epoch[sample_index, :] = y_encoded
 
+            self.backpropagation(x, y_encoded)
             if self.gradient_method == 'GD':
-                self.backward_GD(x, y_encoded)
                 self.steepest_descent(lr)
             elif self.gradient_method == 'NAG':
                 self.backward_NAG(x, y_encoded)
@@ -158,13 +158,16 @@ class NN(object):
 
         return self.layers[1]['output']  # return network prediction vector
 
+    def forward_approx_fprime(self, x: np.ndarray, index: int):  # TODO: use for verification of partial derivatives
+        return self.forward(x)[index]
+
     def calculate_loss(self, y: np.ndarray, y_hat: np.ndarray):
         total_sample_loss = - np.sum(y * np.log(y_hat))
         average_loss = 1 / y_train_g.shape[0] * total_sample_loss
 
         return average_loss
 
-    def backward_GD(self, x: np.ndarray, y: np.ndarray):
+    def backpropagation(self, x: np.ndarray, y: np.ndarray):
         """ Perform backwards pass by computing gradients w.r.t. the model parameters (backpropagate errors through the network using partial derivatives via chain-rule)
 
         param x: sample used for current forward pass
@@ -200,10 +203,10 @@ class NN(object):
         momentum_updated = (1 + np.sqrt(1 + 4 * self.momentum**2)) / 2
 
         # Calculate look-ahead weights
-        self.layers[1]['W1_grad'] = self.layers[1]['W1'] + (self.momentum - 1) / momentum_updated * (self.layers[1]['W1'] - self.last_update_W1)
-        self.layers[1]['b1_grad'] = self.layers[1]['b1'] + (self.momentum - 1) / momentum_updated * (self.layers[1]['b1'] - self.last_update_b1)
-        self.layers[0]['W0_grad'] = self.layers[0]['W0'] + (self.momentum - 1) / momentum_updated * (self.layers[0]['W0'] - self.last_update_W0)
-        self.layers[0]['b0_grad'] = self.layers[0]['b0'] + (self.momentum - 1) / momentum_updated * (self.layers[0]['b0'] - self.last_update_b0)
+        self.layers[1]['W1_intermediate'] = self.layers[1]['W1'] + (self.momentum - 1) / momentum_updated * (self.layers[1]['W1'] - self.last_update_W1)
+        self.layers[1]['b1_intermediate'] = self.layers[1]['b1'] + (self.momentum - 1) / momentum_updated * (self.layers[1]['b1'] - self.last_update_b1)
+        self.layers[0]['W0_intermediate'] = self.layers[0]['W0'] + (self.momentum - 1) / momentum_updated * (self.layers[0]['W0'] - self.last_update_W0)
+        self.layers[0]['b0_intermediate'] = self.layers[0]['b0'] + (self.momentum - 1) / momentum_updated * (self.layers[0]['b0'] - self.last_update_b0)
 
         # Update momentum value for next iteration
         self.momentum = momentum_updated
@@ -226,10 +229,10 @@ class NN(object):
         """
 
         # update gradients based on look-ahead gradients
-        self.layers[1]['W1'] -= lr * self.layers[1]['W1_grad']
-        self.layers[1]['b1'] -= lr * self.layers[1]['b1_grad']
-        self.layers[0]['W0'] -= lr * self.layers[0]['W0_grad']
-        self.layers[0]['b0'] -= lr * self.layers[0]['b0_grad']
+        self.layers[1]['W1'] = self.layers[1]['W1_intermediate'] - lr * self.layers[1]['W1_grad']
+        self.layers[1]['b1'] = self.layers[1]['b1_intermediate'] - lr * self.layers[1]['b1_grad']
+        self.layers[0]['W0'] = self.layers[0]['W0_intermediate'] - lr * self.layers[0]['W0_grad']
+        self.layers[0]['b0'] = self.layers[0]['b0_intermediate'] - lr * self.layers[0]['b0_grad']
 
         # store last gradient updates needed for next optimization step
         self.last_update_W1 = self.layers[1]['W1']
@@ -271,7 +274,7 @@ def task1():
 
     # Model using Nesterovs method
     net_NAG = NN(num_input, num_hidden, num_output, gradient_method='NAG')
-    net_NAG.train(lr=0.001, epochs=350)  # lr = {0.1, 0.001}
+    net_NAG.train(lr=0.01, epochs=350)  # lr = {0.1, 0.001}
     train_losses = net_NAG.get_train_loss_for_epochs()
     train_accuracies = net_NAG.get_train_acc_for_epochs()
     test_accuracies = net_NAG.get_test_acc_for_epochs()
