@@ -14,13 +14,18 @@ y_test_g = np.empty((40,))
 
 
 class NN(object):
-    def __init__(self, num_input: int, num_hidden: int, num_output: int, gradient_method: str, momentum=0.0, dtype=np.float32):
+    def __init__(self, num_input: int, num_hidden: int, num_output: int, gradient_method: str, momentum=0.0, dtype=np.float32, batch_size=1):
         self.num_input = num_input
         self.num_hidden = num_hidden
         self.num_output = num_output
         self.dtype = dtype
         self.gradient_method = gradient_method
         self.last_gradient_update = 0
+
+        self.batch_size = batch_size
+        self.train_loss = []
+        self.train_acc = []
+        self.test_acc = []
 
         self.momentum = 0.0
         self.last_update_W1 = np.empty((3, 16))
@@ -40,6 +45,15 @@ class NN(object):
                             'b0': normal(0, 0.05, self.num_hidden)})  # hidden layer
         self.layers.append({'W1': normal(0, 0.05, (self.num_output, self.num_hidden)),
                             'b1': normal(0, 0.05, self.num_output)})  # output layer
+
+    def get_train_loss_for_epochs(self):
+        return self.train_loss
+
+    def get_train_acc_for_epochs(self):
+        return self.train_acc
+
+    def get_test_acc_for_epochs(self):
+        return self.test_acc
 
     @staticmethod
     def softmax(x: np.ndarray):
@@ -83,18 +97,58 @@ class NN(object):
 
     def train(self, lr, epochs):
         for epoch in range(epochs):
-            for sample_index in range(x_train_g.shape[0]):  # using single batch (i.e. batch_size = 1)
-                mini_batch_x = x_train_g[sample_index]
-                mini_batch_y = self.__encode_output(y_train_g[sample_index])  # converts the target label to the required network output format (i.e. 3 neurons of last layer)
+            self.train_model(lr)
+            self.calculate_test_accuracy()
 
-                self.forward(mini_batch_x)
+    def calculate_test_accuracy(self):
+        """ Calculates test accuracy for whole test set for current epoch (i.e. how the model performs after the current training epoch on the test data).
 
-                if self.gradient_method == 'GD':
-                    self.backward_GD(mini_batch_x, mini_batch_y)
-                    self.steepest_descent(lr)
-                elif self.gradient_method == 'NAG':
-                    self.backward_NAG(mini_batch_x, mini_batch_y)
-                    self.nesterov_accelerated_gradient(lr)
+        """
+
+        test_acc_for_epoch = 0
+
+        for sample_index in range(x_test_g.shape[0]):
+            x = x_test_g[sample_index]
+            y = y_test_g[sample_index]
+            y_encoded = self.__encode_output(y)
+
+            y_hat = self.forward(x)
+
+            # Calculate test accuracy
+            if y == np.argmax(y_hat):
+                test_acc_for_epoch += 1
+
+        self.test_acc.append(test_acc_for_epoch / y_test_g.shape[0])
+
+    def train_model(self, lr):
+        train_acc_for_epoch = 0
+        y_hat_epoch = np.zeros((y_train_g.shape[0], self.num_output))  # model predictions of current epoch
+        y_encoded_epoch = np.zeros((y_train_g.shape[0], self.num_output))  # supervised labels of current epoch
+
+        for sample_index in range(x_train_g.shape[0]):  # using single batch (i.e. batch_size = 1)
+            x = x_train_g[sample_index]
+            y = y_train_g[sample_index]
+            y_encoded = self.__encode_output(y)  # converts the target label to the required network output format (i.e. 3 neurons of last layer)
+
+            y_hat = self.forward(x)
+
+            # # Calculate train accuracy
+            if y == np.argmax(y_hat):
+                train_acc_for_epoch += 1
+
+            # Track model predictions for all batches over epoch
+            y_hat_epoch[sample_index, :] = y_hat
+            y_encoded_epoch[sample_index, :] = y_encoded
+
+            if self.gradient_method == 'GD':
+                self.backward_GD(x, y_encoded)
+                self.steepest_descent(lr)
+            elif self.gradient_method == 'NAG':
+                self.backward_NAG(x, y_encoded)
+                self.nesterov_accelerated_gradient(lr)
+
+        self.train_acc.append(train_acc_for_epoch / x_train_g.shape[0])  # Track training accuracy over epochs
+        self.train_loss.append(self.calculate_loss(y_encoded_epoch, y_hat_epoch))
 
     def forward(self, x: np.ndarray):
         self.layers[0]['pre_activation'] = self.layers[0]['W0'] @ x + self.layers[0]['b0']
@@ -102,7 +156,13 @@ class NN(object):
         self.layers[1]['pre_activation'] = self.layers[1]['W1'] @ self.layers[0]['output'] + self.layers[1]['b1']
         self.layers[1]['output'] = self.softmax(self.layers[1]['pre_activation'])
 
-        return self.layers[1]['output']
+        return self.layers[1]['output']  # return network prediction vector
+
+    def calculate_loss(self, y: np.ndarray, y_hat: np.ndarray):
+        total_sample_loss = - np.sum(y * np.log(y_hat))
+        average_loss = 1 / y_train_g.shape[0] * total_sample_loss
+
+        return average_loss
 
     def backward_GD(self, x: np.ndarray, y: np.ndarray):
         """ Perform backwards pass by computing gradients w.r.t. the model parameters (backpropagate errors through the network using partial derivatives via chain-rule)
@@ -205,10 +265,16 @@ def task1():
     # net_GD.backward(y_train_g[0], y_hat)
     # net_GD = NN(num_input, num_hidden, num_output, gradient_method='GD')  # create NN with the steepest gradient descent
     # net_GD.train(lr=0.01, epochs=350)  # lr = {0.1, 0.001}
+    # train_losses = net_GD.get_train_loss_for_epochs()
+    # train_accuracies = net_GD.get_train_acc_for_epochs()
+    # test_accuracies = net_GD.get_test_acc_for_epochs()
 
     # Model using Nesterovs method
     net_NAG = NN(num_input, num_hidden, num_output, gradient_method='NAG')
-    net_NAG.train(lr=0.01, epochs=350)  # lr = {0.1, 0.001}
+    net_NAG.train(lr=0.001, epochs=350)  # lr = {0.1, 0.001}
+    train_losses = net_NAG.get_train_loss_for_epochs()
+    train_accuracies = net_NAG.get_train_acc_for_epochs()
+    test_accuracies = net_NAG.get_test_acc_for_epochs()
 
     # Export models
     # net_GD.export_model()
