@@ -248,7 +248,7 @@ class NN(object):
     def export_model(self):
         with open(f'model_{self.gradient_method}.json', 'w') as fp:
             for layer in self.layers:
-                json.dump({key: value.tolist() for key, value in layer.items()}, fp)
+                json.dump({key: value.tolist() for key, value in layer.items() if key in ['W0', 'b0', 'W1', 'b1']}, fp)
 
 
 def task1():
