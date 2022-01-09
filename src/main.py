@@ -111,7 +111,6 @@ class NN(object):
         for sample_index in range(x_test_g.shape[0]):
             x = x_test_g[sample_index]
             y = y_test_g[sample_index]
-            y_encoded = self.__encode_output(y)
 
             y_hat = self.forward(x)
 
@@ -275,11 +274,6 @@ def task1():
 def __train_with_nesterov_accelerated_gradient(num_epochs, num_hidden, num_input, num_output):
     net_NAG = NN(num_input, num_hidden, num_output, gradient_method='NAG')
     net_NAG.train(lr=0.01, epochs=num_epochs)  # lr = {0.1, 0.001}
-
-    train_losses = net_NAG.get_train_loss_for_epochs()
-    train_accuracies = net_NAG.get_train_acc_for_epochs()
-    test_accuracies = net_NAG.get_test_acc_for_epochs()
-
     net_NAG.export_model()
 
     return net_NAG
@@ -288,11 +282,6 @@ def __train_with_nesterov_accelerated_gradient(num_epochs, num_hidden, num_input
 def __train_with_steepest_descent(num_epochs, num_hidden, num_input, num_output):
     net_GD = NN(num_input, num_hidden, num_output, gradient_method='GD')
     net_GD.train(lr=0.01, epochs=num_epochs)  # lr = {0.1, 0.001}
-
-    train_losses = net_GD.get_train_loss_for_epochs()
-    train_accuracies = net_GD.get_train_acc_for_epochs()
-    test_accuracies = net_GD.get_test_acc_for_epochs()
-
     net_GD.export_model()
 
     return net_GD
@@ -311,16 +300,20 @@ def __create_plots(net_GD: NN, net_NAG: NN):
     GD_train_losses = net_GD.get_train_loss_for_epochs()
     NAG_train_losses = net_NAG.get_train_loss_for_epochs()
 
-    sg_loss, = axs[0].semilogy(epochs, GD_train_losses, color="green", label="Steepest Descent")
-    nag_loss, = axs[0].semilogy(epochs, NAG_train_losses, color="blue", label="Nesterov Accelerated Gradient")
+    sg_loss, = axs[0].semilogy(epochs, GD_train_losses, color="forestgreen", label="Steepest Descent")
+    nag_loss, = axs[0].semilogy(epochs, NAG_train_losses, color="mediumblue", label="Nesterov Accelerated Gradient")
     axs[0].legend(handles=[sg_loss, nag_loss])
 
     GD_train_acc = net_GD.get_train_acc_for_epochs()
+    GD_test_acc = net_GD.get_test_acc_for_epochs()
     NAG_train_acc = net_NAG.get_train_acc_for_epochs()
+    NAG_test_acc = net_NAG.get_test_acc_for_epochs()
 
-    sg_acc, = axs[1].plot(epochs, GD_train_acc, color="green", label="Steepest Descent")
-    nag_acc, = axs[1].plot(epochs, NAG_train_acc, color="blue", label="Nesterov Accelerated Gradient")
-    axs[1].legend(handles=[sg_acc, nag_acc])
+    sg_train_acc, = axs[1].plot(epochs, GD_train_acc, color="forestgreen", label="Steepest Descent: train acc")
+    sg_test_acc, = axs[1].plot(epochs, GD_test_acc, color="darkred", label="Steepest Descent: test acc")
+    nag_train_acc, = axs[1].plot(epochs, NAG_train_acc, color="mediumblue", label="Nesterov Accelerated Gradient: train acc")
+    nag_test_acc, = axs[1].plot(epochs, NAG_test_acc, color="darkorange", label="Nesterov Accelerated Gradient: test acc")
+    axs[1].legend(handles=[sg_train_acc, nag_train_acc, sg_test_acc, nag_test_acc])
 
     axs[1].set_title('Accuracy')
     axs[1].grid()
