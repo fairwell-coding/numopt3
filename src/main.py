@@ -22,7 +22,7 @@ class NN(object):
         self.gradient_method = gradient_method
         self.last_gradient_update = 0
 
-        self.momentum = momentum
+        self.momentum = 0.0
         self.last_update_W1 = np.empty((3, 16))
         self.last_update_b1 = np.empty((3,))
         self.last_update_W0 = np.empty((16, 4))
@@ -59,10 +59,8 @@ class NN(object):
         return: softmax derivative of x
         """
 
-        # s = NN.softmax(x).reshape(-1, 1)  # Reshape the 1-d softmax to 2-d so that np.dot will do the matrix multiplication
-        # return np.diagflat(s) - np.dot(s, s.T)
-
-        return x  # TODO: dummy replacement to continue implementation
+        s = NN.softmax(x).reshape(-1, 1)  # reshape vector to matrix
+        return np.diagflat(s) - np.dot(s, s.T)  # for i = j we have the same diagonal y_hat - y_hat**2 | for i != j we have - y_hat**2
 
     @staticmethod
     def softplus(x: np.ndarray):
@@ -116,7 +114,7 @@ class NN(object):
         # Calculate gradients for parameters of output layer
         del_L_a2 = - y / self.layers[1]['output']  # derivative of loss function w.r.t. predicted output (i.e. activation of output layer: a2)
         del_a2_z2 = self.softmax_derivative(self.layers[1]['pre_activation'])  # derivative of activated output of output layer (a2) w.r.t. its weighted input (z2)
-        delta_1 = del_L_a2 * del_a2_z2  # = delta_1, b1 | (del_L / del_a2) * (del_a2 / del_z2): derivative of loss (L) w.r.t. pre-activation of output layer (z2)
+        delta_1 = np.matmul(del_a2_z2, del_L_a2)  # = delta_1, b1 | (del_L / del_a2) * (del_a2 / del_z2): derivative of loss (L) w.r.t. pre-activation of output layer (z2)
         del_L_W1 = np.outer(delta_1, self.layers[0]['output'].T)  # W1 | delta_1 * a1.T: derivative of loss (L) w.r.t. weight matrix of output layer (W1)
 
         # Calculate gradients for parameters of hidden layer
@@ -138,25 +136,17 @@ class NN(object):
         param y: supervised label
         """
 
+        # Calculate adaptive momentum value
+        momentum_updated = (1 + np.sqrt(1 + 4 * self.momentum**2)) / 2
+
         # Calculate look-ahead weights
-        W1_look_ahead = self.layers[1]['W1'] - self.momentum * self.last_update_W1
-        b1_look_ahead = self.layers[1]['b1'] - self.momentum * self.last_update_b1
-        W0_look_ahead = self.layers[0]['W0'] - self.momentum * self.last_update_W0
-        b0_look_ahead = self.layers[0]['b0'] - self.momentum * self.last_update_b0
+        self.layers[1]['W1_grad'] = self.layers[1]['W1'] + (self.momentum - 1) / momentum_updated * (self.layers[1]['W1'] - self.last_update_W1)
+        self.layers[1]['b1_grad'] = self.layers[1]['b1'] + (self.momentum - 1) / momentum_updated * (self.layers[1]['b1'] - self.last_update_b1)
+        self.layers[0]['W0_grad'] = self.layers[0]['W0'] + (self.momentum - 1) / momentum_updated * (self.layers[0]['W0'] - self.last_update_W0)
+        self.layers[0]['b0_grad'] = self.layers[0]['b0'] + (self.momentum - 1) / momentum_updated * (self.layers[0]['b0'] - self.last_update_b0)
 
-        # Calculate gradients for parameters of output layer
-        delta_1 = b1_look_ahead  # use look-head instead of calculating the current value
-        del_L_W1 = np.outer(delta_1, self.layers[0]['output'].T)  # W1 | delta_1 * a1.T: derivative of loss (L) w.r.t. weight matrix of output layer (W1)
-
-        # Calculate gradients for parameters of hidden layer
-        delta_0 = b0_look_ahead
-        del_L_W0 = np.outer(delta_0, x.T)  # W0 | delta_0 * x.T: derivative of loss (L) w.r.t. weight matrix of hidden layer (W0)
-
-        # Store calculated gradients in their respective network layers
-        self.layers[1]['W1_grad'] = del_L_W1
-        self.layers[1]['b1_grad'] = delta_1
-        self.layers[0]['W0_grad'] = del_L_W0
-        self.layers[0]['b0_grad'] = delta_0
+        # Update momentum value for next iteration
+        self.momentum = momentum_updated
 
     def steepest_descent(self, lr):
         """ Optimize network weights based on steepest gradient descent algorithm to update model weights for current training iteration
@@ -176,10 +166,10 @@ class NN(object):
         """
 
         # update gradients based on look-ahead gradients
-        self.layers[1]['W1'] -= self.momentum * self.last_update_W1 + lr * self.layers[1]['W1_grad']
-        self.layers[1]['b1'] -= self.momentum * self.last_update_b1 + lr * self.layers[1]['b1_grad']
-        self.layers[0]['W0'] -= self.momentum * self.last_update_W0 + lr * self.layers[0]['W0_grad']
-        self.layers[0]['b0'] -= self.momentum * self.last_update_b0 + lr * self.layers[0]['b0_grad']
+        self.layers[1]['W1'] -= lr * self.layers[1]['W1_grad']
+        self.layers[1]['b1'] -= lr * self.layers[1]['b1_grad']
+        self.layers[0]['W0'] -= lr * self.layers[0]['W0_grad']
+        self.layers[0]['b0'] -= lr * self.layers[0]['b0_grad']
 
         # store last gradient updates needed for next optimization step
         self.last_update_W1 = self.layers[1]['W1']
@@ -217,8 +207,8 @@ def task1():
     # net_GD.train(lr=0.01, epochs=350)  # lr = {0.1, 0.001}
 
     # Model using Nesterovs method
-    net_NAG = NN(num_input, num_hidden, num_output, gradient_method='NAG', momentum=0.9)
-    net_NAG.train(lr=0.01, epochs=350)
+    net_NAG = NN(num_input, num_hidden, num_output, gradient_method='NAG')
+    net_NAG.train(lr=0.01, epochs=350)  # lr = {0.1, 0.001}
 
     # Export models
     # net_GD.export_model()
