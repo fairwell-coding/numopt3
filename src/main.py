@@ -263,31 +263,37 @@ def task1():
     num_input = 4
     num_hidden = 16
     num_output = 3
+    num_epochs = 350
 
-    # y_hat = net_GD.forward(x_test_g[0, :])
-    # net_GD.backward(y_train_g[0], y_hat)
-    # net_GD = NN(num_input, num_hidden, num_output, gradient_method='GD')  # create NN with the steepest gradient descent
-    # net_GD.train(lr=0.01, epochs=350)  # lr = {0.1, 0.001}
-    # train_losses = net_GD.get_train_loss_for_epochs()
-    # train_accuracies = net_GD.get_train_acc_for_epochs()
-    # test_accuracies = net_GD.get_test_acc_for_epochs()
-
-    # Model using Nesterovs method
-    net_NAG = NN(num_input, num_hidden, num_output, gradient_method='NAG')
-    net_NAG.train(lr=0.01, epochs=350)  # lr = {0.1, 0.001}
-    train_losses = net_NAG.get_train_loss_for_epochs()
-    train_accuracies = net_NAG.get_train_acc_for_epochs()
-    test_accuracies = net_NAG.get_test_acc_for_epochs()
-
-    # Export models
-    # net_GD.export_model()
-    # net_NAG.export_model()
+    __train_with_steepest_descent(num_epochs, num_hidden, num_input, num_output)
+    # __train_with_nesterov_accelerated_gradient(num_epochs, num_hidden, num_input, num_output)
 
     return __create_plots()
 
 
+def __train_with_nesterov_accelerated_gradient(num_epochs, num_hidden, num_input, num_output):
+    net_NAG = NN(num_input, num_hidden, num_output, gradient_method='NAG')
+    net_NAG.train(lr=0.01, epochs=num_epochs)  # lr = {0.1, 0.001}
+
+    train_losses = net_NAG.get_train_loss_for_epochs()
+    train_accuracies = net_NAG.get_train_acc_for_epochs()
+    test_accuracies = net_NAG.get_test_acc_for_epochs()
+
+    net_NAG.export_model()
+
+
+def __train_with_steepest_descent(num_epochs, num_hidden, num_input, num_output):
+    net_GD = NN(num_input, num_hidden, num_output, gradient_method='GD')
+    net_GD.train(lr=0.01, epochs=num_epochs)  # lr = {0.1, 0.001}
+
+    train_losses = net_GD.get_train_loss_for_epochs()
+    train_accuracies = net_GD.get_train_acc_for_epochs()
+    test_accuracies = net_GD.get_test_acc_for_epochs()
+
+    net_GD.export_model()
+
+
 def __create_plots():
-    # Configure plot
     fig = plt.figure(figsize=[12, 6])
     axs = []
     axs.append(fig.add_subplot(121))
@@ -296,6 +302,7 @@ def __create_plots():
     axs[0].grid()
     axs[1].set_title('Accuracy')
     axs[1].grid()
+
     return fig
 
 
