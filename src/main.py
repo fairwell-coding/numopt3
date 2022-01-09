@@ -14,11 +14,12 @@ y_test_g = np.empty((40,))
 
 
 class NN(object):
-    def __init__(self, num_input: int, num_hidden: int, num_output: int, gradient_method: str, momentum=0.0, dtype=np.float32, batch_size=1):
+    def __init__(self, num_input: int, num_hidden: int, num_output: int, gradient_method: str, dtype=np.float32, batch_size=1):
         self.num_input = num_input
         self.num_hidden = num_hidden
         self.num_output = num_output
         self.dtype = dtype
+
         self.gradient_method = gradient_method
         self.last_gradient_update = 0
 
@@ -265,10 +266,10 @@ def task1():
     num_output = 3
     num_epochs = 350
 
-    __train_with_steepest_descent(num_epochs, num_hidden, num_input, num_output)
-    # __train_with_nesterov_accelerated_gradient(num_epochs, num_hidden, num_input, num_output)
+    net_GD = __train_with_steepest_descent(num_epochs, num_hidden, num_input, num_output)
+    net_NAG = __train_with_nesterov_accelerated_gradient(num_epochs, num_hidden, num_input, num_output)
 
-    return __create_plots()
+    return __create_plots(net_GD, net_NAG)
 
 
 def __train_with_nesterov_accelerated_gradient(num_epochs, num_hidden, num_input, num_output):
@@ -281,6 +282,8 @@ def __train_with_nesterov_accelerated_gradient(num_epochs, num_hidden, num_input
 
     net_NAG.export_model()
 
+    return net_NAG
+
 
 def __train_with_steepest_descent(num_epochs, num_hidden, num_input, num_output):
     net_GD = NN(num_input, num_hidden, num_output, gradient_method='GD')
@@ -292,14 +295,33 @@ def __train_with_steepest_descent(num_epochs, num_hidden, num_input, num_output)
 
     net_GD.export_model()
 
+    return net_GD
 
-def __create_plots():
+
+def __create_plots(net_GD: NN, net_NAG: NN):
     fig = plt.figure(figsize=[12, 6])
     axs = []
     axs.append(fig.add_subplot(121))
     axs.append(fig.add_subplot(122))
     axs[0].set_title('Loss')
     axs[0].grid()
+
+    epochs = np.arange(1, 350 + 1)  # 350 epochs
+
+    GD_train_losses = net_GD.get_train_loss_for_epochs()
+    NAG_train_losses = net_NAG.get_train_loss_for_epochs()
+
+    sg_loss, = axs[0].semilogy(epochs, GD_train_losses, color="green", label="Steepest Descent")
+    nag_loss, = axs[0].semilogy(epochs, NAG_train_losses, color="blue", label="Nesterov Accelerated Gradient")
+    axs[0].legend(handles=[sg_loss, nag_loss])
+
+    GD_train_acc = net_GD.get_train_acc_for_epochs()
+    NAG_train_acc = net_NAG.get_train_acc_for_epochs()
+
+    sg_acc, = axs[1].plot(epochs, GD_train_acc, color="green", label="Steepest Descent")
+    nag_acc, = axs[1].plot(epochs, NAG_train_acc, color="blue", label="Nesterov Accelerated Gradient")
+    axs[1].legend(handles=[sg_acc, nag_acc])
+
     axs[1].set_title('Accuracy')
     axs[1].grid()
 
