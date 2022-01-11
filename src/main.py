@@ -158,8 +158,42 @@ class NN(object):
 
         return self.layers[1]['output']  # return network prediction vector
 
-    def forward_approx_fprime(self, x: np.ndarray, index: int):  # TODO: use for verification of partial derivatives
-        return self.forward(x)[index]
+    def backpropagation_verification(self, x: np.ndarray, y: np.ndarray):
+        """ Perform backtracking path based on manually calculated gradients (pen & paper) from total output (i.e. average loss) to input vector x (used for numerical gradient verification via
+        approx_fprime).
+
+        param x: sample used for current forward pass
+        param y: supervised label
+        """
+
+        del_L_a2 = - y / self.layers[1]['output']  # derivative of loss function w.r.t. predicted output (i.e. activation of output layer: a2)
+        del_a2_z2 = self.softmax_derivative(self.layers[1]['pre_activation'])  # derivative of activated output of output layer (a2) w.r.t. its weighted input (z2)
+        delta_1 = np.matmul(del_a2_z2, del_L_a2)  # = delta_1, b1 | (del_L / del_a2) * (del_a2 / del_z2): derivative of loss (L) w.r.t. pre-activation of output layer (z2)
+        del_L_a1 = np.matmul(self.layers[1]['W1'].T, delta_1)  # derivative of loss function w.r.t. activated output of hidden layer (i.e. a1)
+        del_a1_z1 = self.softplus_derivative(self.layers[0]['pre_activation'])  # derivative of activated output of hidden layer (a1) w.r.t. its weighted input (z1)
+        delta_0 = del_L_a1 * del_a1_z1  # = delta_2, b0 | (del_L / del_z1): derivative of loss (L) w.r.t. pre-activation of hidden layer (z1)
+
+        return np.matmul(self.layers[0]['W0'].T, delta_0)
+
+    def verify_gradient_with_numerical_approximation(self, sample_index: int):
+        approx_gradient = approx_fprime(x_train_g[sample_index], self.input_to_loss, 1e-4, sample_index)
+        analytical_gradient = self.backpropagation_verification(x_train_g[sample_index], y_train_g[sample_index])
+
+        gradient_differenced = analytical_gradient - approx_gradient
+        print('Difference between analytical/calculated and numerically approximated gradient: {0}'.format(gradient_differenced))
+
+    def input_to_loss(self, x: np.ndarray, sample_index: int):
+        """ Method used to numerically verify our calculated gradients (i.e. from input vector x of a sample up to total output which is loss which has the format needed to call approx_fprime).
+
+        :param x: any input sample from training data
+        :param sample_index: sample index for verification
+        :return: sample loss
+        """
+
+        y_hat = self.forward(x_train_g[sample_index])
+        sample_loss = self.calculate_loss(y_train_g[sample_index], y_hat)
+
+        return sample_loss
 
     def calculate_loss(self, y: np.ndarray, y_hat: np.ndarray):
         total_sample_loss = - np.sum(y * np.log(y_hat))
@@ -265,10 +299,19 @@ def task1():
     num_output = 3
     num_epochs = 350
 
+    __verify_gradients(num_hidden, num_input, num_output, 1)  # verify gradients for 2nd sample (index = 1)
     net_GD = __train_with_steepest_descent(num_epochs, num_hidden, num_input, num_output)
     net_NAG = __train_with_nesterov_accelerated_gradient(num_epochs, num_hidden, num_input, num_output)
 
     return __create_plots(net_GD, net_NAG)
+
+
+def __verify_gradients(num_hidden, num_input, num_output, sample_index):
+    """ Manually verifies gradients (analytical calculation vs numerical approximation via approx_fprime).
+    """
+
+    net_verify_gradients = NN(num_input, num_hidden, num_output, gradient_method='NAG')
+    net_verify_gradients.verify_gradient_with_numerical_approximation(sample_index)
 
 
 def __train_with_nesterov_accelerated_gradient(num_epochs, num_hidden, num_input, num_output):
